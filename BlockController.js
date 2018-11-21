@@ -1,5 +1,16 @@
 const BlockchainClass = require('./simpleChain.js');
 
+const TimeoutRequestsWindowTime = 0.5*60*1000;
+
+class RequestObject{
+    constructor(address){
+     this.walletAddress = address;
+     this.requestTimeStamp = "";
+     this.message = "";
+     this.validationWindow = 0;
+    }
+}
+
 /**
  * Controller Definition to encapsulate routes to work with blocks
  */
@@ -14,6 +25,10 @@ class BlockController {
         this.blockChain = new BlockchainClass.Blockchain();
         this.getBlockByIndex();
         this.postNewBlock();
+
+        this.mempool = [];
+        this.timeoutRequests = [];
+        this.requestValidation();
     }
 
     /**
@@ -57,6 +72,43 @@ class BlockController {
                 res.status(500).send("There is no data payload!");
             }
         });
+    }
+
+    /**
+     * Implement a POST Endpoint to submit a validation request, url: "/requestValidation"
+     */    
+    requestValidation() {
+        let self = this;
+        self.app.post("/requestValidation", (req, res) => {
+            let address = req.body.address;
+            if (address) {
+                if (address in self.mempool) {
+                // The same request is already in the mempool.
+                    let request = self.mempool[address];
+                    let timeElapse = (new Date().getTime().toString().slice(0,-3)) - request.requestTimeStamp;
+                    let timeLeft = (TimeoutRequestsWindowTime/1000) - timeElapse;
+                    request.validationWindow = timeLeft;
+                    res.status(200).send(request);
+                } else {
+                    let request = new RequestObject(address);
+                    request.requestTimeStamp = (new Date().getTime().toString().slice(0,-3));
+                    request.validationWindow = TimeoutRequestsWindowTime / 1000;
+                    request.message = address + ":" + request.requestTimeStamp
+                        + ":starRegistry";
+                    self.mempool[address] = request;
+                    self.timeoutRequests[address]=setTimeout(function(){ self.removeValidationRequest(address) }, TimeoutRequestsWindowTime);
+                    res.status(200).send(request);
+                }
+            } else {
+                req.status(500).send("This is no address!");
+            }
+        });
+    }
+
+    removeValidationRequest(walletAddress) {
+        console.log(`${walletAddress} request is time out, remove it from mempool.`);
+        delete this.mempool[walletAddress];
+        delete this.timeoutRequests[walletAddress];
     }
 }
 
