@@ -110,6 +110,15 @@ class BlockController {
         delete this.mempool[walletAddress];
         delete this.timeoutRequests[walletAddress];
     }
+
+    /**
+     * Implement a POST Endpoint to validate message signature, url: "/message-signature/validate"
+     */    
+    validate() {
+        let self = this;
+        self.app.post("/message-signature/validate", (req, res) => {
+        }
+    }
 }
 
 /**
