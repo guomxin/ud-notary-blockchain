@@ -1,6 +1,8 @@
 const BlockchainClass = require('./simpleChain.js');
 
-const TimeoutRequestsWindowTime = 0.5*60*1000;
+const TimeoutRequestsWindowTime = 5*60*1000;
+
+const BitcoinMessage = require('bitcoinjs-message');
 
 class RequestObject{
     constructor(address){
@@ -8,6 +10,13 @@ class RequestObject{
      this.requestTimeStamp = "";
      this.message = "";
      this.validationWindow = 0;
+    }
+}
+
+class ValidRequestObject {
+    constructor() {
+        this.registerStar = false;
+        this.status = {};
     }
 }
 
@@ -27,8 +36,10 @@ class BlockController {
         this.postNewBlock();
 
         this.mempool = [];
+        this.validRequests = [];
         this.timeoutRequests = [];
         this.requestValidation();
+        this.validate();
     }
 
     /**
@@ -100,15 +111,17 @@ class BlockController {
                     res.status(200).send(request);
                 }
             } else {
-                req.status(500).send("This is no address!");
+                res.status(500).send("There is no address!");
             }
         });
     }
 
     removeValidationRequest(walletAddress) {
-        console.log(`${walletAddress} request is time out, remove it from mempool.`);
-        delete this.mempool[walletAddress];
-        delete this.timeoutRequests[walletAddress];
+        if (walletAddress in this.mempool) {
+            console.log(`${walletAddress} request, remove it from mempool.`);
+            delete this.mempool[walletAddress];
+            delete this.timeoutRequests[walletAddress];
+        }
     }
 
     /**
@@ -117,7 +130,46 @@ class BlockController {
     validate() {
         let self = this;
         self.app.post("/message-signature/validate", (req, res) => {
-        }
+            let address = req.body.address;
+            let signature = req.body.signature;
+            if (address && signature) {
+                if (address in self.mempool) {
+                    let request = self.mempool[address];
+                    // Verify time left information
+                    let timeElapse = (new Date().getTime().toString().slice(0,-3)) - request.requestTimeStamp;
+                    let timeLeft = (TimeoutRequestsWindowTime/1000) - timeElapse;
+                    request.validationWindow = timeLeft;
+                    if (request.validationWindow <= 0) {
+                        res.status(500).send(`${address} request is time out!`);
+                    } 
+
+                    // Verify the signature
+                    let isValid = BitcoinMessage.verify(request.message, address, signature);
+                    if (!isValid) {
+                        res.status(500).send("Signature isn't valid!");
+                    } else {
+                        let validRequest = new ValidRequestObject();
+                        validRequest.registerStar = true;
+                        validRequest.status = {
+                            address: request.walletAddress,
+                            requestTimeStamp: request.requestTimeStamp,
+                            message: request.message,
+                            validationWindow: request.validationWindow,
+                            messageSignature: true
+                        };
+                        self.validRequests[address] = validRequest;
+                        res.status(200).send(validRequest);
+                        // Remove from timeout array and mempool
+                        self.removeValidationRequest(address);
+                    }
+
+                } else {
+                    res.status(500).send(`${address} request is time out or not exist!`);
+                }
+            } else {
+                res.status(500).send("There is no address or signature!");
+            }
+        });
     }
 }
 
