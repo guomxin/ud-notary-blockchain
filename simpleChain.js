@@ -46,7 +46,7 @@ class Blockchain{
           genesisBlock.height = 0;
           genesisBlock.time = new Date().getTime().toString().slice(0,-3);
           genesisBlock.hash = SHA256(JSON.stringify(genesisBlock)).toString();
-          db.addLevelDBData(genesisBlock.height, JSON.stringify(genesisBlock))
+          db.addLevelDBData(genesisBlock.height, genesisBlock)
           .then((result) => {
             // Block height
             newBlock.height = 1;
@@ -57,9 +57,9 @@ class Blockchain{
             // Block hash with SHA256 using newBlock and converting to a string
             newBlock.hash = SHA256(JSON.stringify(newBlock)).toString();
             // Saving block object to LevelDB
-            db.addLevelDBData(newBlock.height, JSON.stringify(newBlock))
+            db.addLevelDBData(newBlock.height, newBlock)
             .then((result) => {
-              resolve(newBlock);
+              resolve(result);
             })
             .catch((err) => {
               reject(err);
@@ -80,9 +80,9 @@ class Blockchain{
             // Block hash with SHA256 using newBlock and converting to a string
             newBlock.hash = SHA256(JSON.stringify(newBlock)).toString();
             // Saving block object to LevelDB
-            db.addLevelDBData(newBlock.height, JSON.stringify(newBlock))
+            db.addLevelDBData(newBlock.height, newBlock)
             .then((result) => {
-              resolve(newBlock);
+              resolve(result);
             })
             .catch((err) => {
               reject(err);
@@ -112,13 +112,39 @@ class Blockchain{
       });
     }
 
-    // get block
+    // get block by hash
+    getBlockByHash(hash){
+      return new Promise(function(resolve, reject) {
+        db.getDataByHash(hash)
+        .then((result) => {
+          resolve(result);
+        })
+        .catch((err) => {
+          reject(err);
+        })
+      });
+    }
+
+    // get blocks by address
+    getBlocksByAddress(address){
+      return new Promise(function(resolve, reject) {
+        db.getDataByAddress(address)
+        .then((result) => {
+          resolve(result);
+        })
+        .catch((err) => {
+          reject(err);
+        })
+      });
+    }
+
+    // get block by height
     getBlock(blockHeight){
       return new Promise(function(resolve, reject) {
         db.getLevelDBData(blockHeight)
         .then((result) => {
           if (result) {
-            resolve(JSON.parse(result));
+            resolve(result);
           } else {
             resolve(undefined);
           }

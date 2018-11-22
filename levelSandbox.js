@@ -7,7 +7,7 @@ const chainDB = './chaindata';
 
 class LevelSandbox {
   constructor() {
-    this.db = level(chainDB);
+    this.db = level(chainDB, {valueEncoding: 'json'});
   }
 
   // Add data to levelDB with key/value pair
@@ -62,6 +62,42 @@ class LevelSandbox {
         .catch((err) => {
           reject(err);
         });
+      });
+    });
+  }
+
+  // Get data by hash
+  getDataByHash(hash) {
+    let self = this;
+    let block = undefined;
+    return new Promise(function(resolve, reject) {
+      self.db.createValueStream().on('data', function(data) {
+        if (data.hash === hash) {
+          block = data;
+        }
+      }).on('error', function(err) {
+        console.log('Unable to read data stream!', err);
+        reject(err);
+      }).on('close', function() {
+        resolve(block);  
+      });
+    });
+  }
+
+  // Get data by address
+  getDataByAddress(address) {
+    let self = this;
+    let blocks = [];
+    return new Promise(function(resolve, reject) {
+      self.db.createValueStream().on('data', function(data) {
+        if (data.body.address === address) {
+          blocks.push(data);
+        }
+      }).on('error', function(err) {
+        console.log('Unable to read data stream!', err);
+        reject(err);
+      }).on('close', function() {
+        resolve(blocks);  
       });
     });
   }
