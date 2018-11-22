@@ -254,6 +254,9 @@ class BlockController {
                         .then((result) => {
                             // Decode story
                             result.body.star.storyDecoded = hex2ascii(result.body.star.story);
+                            // During the validation window, user can only register a single star.
+                            // Once user has registered a star, remove validation request from mempool.
+                            delete self.mempoolValid[address];
                             res.send(result);
                         })
                         .catch((err) => {
