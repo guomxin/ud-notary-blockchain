@@ -238,30 +238,39 @@ class BlockController {
                         delete self.mempoolValid[address];
                         res.status(500).send(`${address} request is time out!`);
                     } else {
-                        let starStory = star.story;
-                        if (starStory.length > 500) {
-                            starStory = starStory.slice(0, 500);
+                        if (!(/^[\x00-\x7F]*$/.test(star.story))) {
+                            // Non-ascii symbol detected
+                            res.status(500).send("Non-ASCII symbol detected in star story!");
+                            return;
                         }
-                        let blockBody = {
-                            address: address,
-                            star: {
-                                ra: star.ra,
-                                dec: star.dec,
-                                story: Buffer(starStory).toString('hex')
+                        if (star.story && star.ra && star.dec) {
+                            let starStory = star.story;
+                            if (starStory.length > 500) {
+                                starStory = starStory.slice(0, 500);
                             }
+                            let blockBody = {
+                                address: address,
+                                star: {
+                                    ra: star.ra,
+                                    dec: star.dec,
+                                    story: Buffer(starStory).toString('hex')
+                                }
+                            }
+                            self.blockChain.addBlock(blockBody)
+                            .then((result) => {
+                                // Decode story
+                                result.body.star.storyDecoded = hex2ascii(result.body.star.story);
+                                // During the validation window, user can only register a single star.
+                                // Once user has registered a star, remove validation request from mempool.
+                                delete self.mempoolValid[address];
+                                res.send(result);
+                            })
+                            .catch((err) => {
+                                res.status(500).send("Error occurs while adding star block data!");
+                            })
+                        } else {
+                            res.status(500).send("Star body should contain ra, dec and story");
                         }
-                        self.blockChain.addBlock(blockBody)
-                        .then((result) => {
-                            // Decode story
-                            result.body.star.storyDecoded = hex2ascii(result.body.star.story);
-                            // During the validation window, user can only register a single star.
-                            // Once user has registered a star, remove validation request from mempool.
-                            delete self.mempoolValid[address];
-                            res.send(result);
-                        })
-                        .catch((err) => {
-                            res.status(500).send("Error occurs while adding star block data!");
-                        })
                     }
                 } else {
                     res.status(500).send("Address hasn't been validated!");
